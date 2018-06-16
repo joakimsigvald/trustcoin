@@ -3,6 +3,7 @@
     public class RelationData
     {
         public float Strength { get; set; }
+        public bool IsEndorcer { get; set; }
 
         public void Strengthen()
         {

@@ -8,7 +8,7 @@ namespace Trustcoin.Story.Test
         [Test]
         public void MedianOfNothingIsUnknown()
         {
-            Assert.That(new (float,float)[0].Median(), Is.Null);
+            Assert.That(new (float,float?)[0].Median(), Is.Null);
         }
 
         [TestCase(1, 1, 1)]

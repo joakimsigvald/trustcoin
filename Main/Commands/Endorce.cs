@@ -3,7 +3,7 @@ using Trustcoin.Story;
 
 namespace Trustcoin.Main.Commands
 {
-    public class Like : Command
+    public class Endorce : Command
     {
         public void Execute(params string[] args)
         {
@@ -11,7 +11,7 @@ namespace Trustcoin.Main.Commands
             var targetName = args.SecondOrDefault() ?? Program.Ask("Name target");
             var source = Program.Network.Get(sourceName);
             var target = Program.Network.Get(targetName);
-            source.Like(target);
+            source.Endorce(target);
         }
 
         public string Name => "like";

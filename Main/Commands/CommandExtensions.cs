@@ -14,8 +14,8 @@ namespace Trustcoin.Main.Commands
             => cmd.Short == input[0]
                 ? new CommandMatch
                 {
-                    PrimaryCommand = cmd.Commands[0],
                     Arguments = input.Substring(1).Split(','),
+                    PrimaryCommand = cmd.Commands[0],
                     PostCommands = cmd.Commands.Skip(1)
                 }
                 : null;
