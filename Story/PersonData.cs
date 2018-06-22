@@ -1,36 +1,47 @@
+using System;
 using System.Collections.Generic;
 
 namespace Trustcoin.Story
 {
-    public class PersonData
+    internal class PersonData
     {
         private const float MaxTrust = 0.999f;
 
         private readonly Person _subject;
+        private readonly Dictionary<Person, RelationData> _relations = new Dictionary<Person, RelationData>();
 
-        public PersonData(Person subject)
+        internal PersonData(Person subject)
         {
             _subject = subject;
         }
 
-        private bool IsEndorced { get; set; }
-        private readonly Dictionary<Person, RelationData> _relations = new Dictionary<Person, RelationData>();
+        internal bool IsEndorced { get; private set; }
 
-        public float? Trust
+        internal float? Trust
         {
             get; set;
         }
 
-        public float? Money
+        internal float? Money
         {
             get; set;
         }
 
-        public void Endorce()
+        internal void Endorce()
         {
-            if (IsEndorced) return;
             IsEndorced = true;
+            Money = null;
             IncreaseTrust();
+        }
+
+        internal RelationData Get(Person person)
+            => _relations.TryGetValue(person, out var nd)
+                ? nd
+                : _relations[person] = new RelationData();
+
+        internal void AddEndorcementMoney(PersonData endorcerData, RelationData relation)
+        {
+            Money += endorcerData.GenerateEndorcementMoney(relation);
         }
 
         private void IncreaseTrust()
@@ -38,9 +49,7 @@ namespace Trustcoin.Story
             Trust += _subject.EndorcementTrustFactor * (MaxTrust - Trust);
         }
 
-        public RelationData Get(Person person)
-            => _relations.TryGetValue(person, out var nd)
-                ? nd
-                : _relations[person] = new RelationData();
+        private float GenerateEndorcementMoney(RelationData relation)
+            => (float)Math.Sqrt(Trust.Value * (1 - relation.Strength));
     }
 }

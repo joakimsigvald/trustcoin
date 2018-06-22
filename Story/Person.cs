@@ -1,16 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using System;
 
 namespace Trustcoin.Story
 {
-    public interface Person
+    public interface Person : IEquatable<Person>
     {
         int Id { get; }
         string Name { get; }
-        float GeneralTrust { get; set; }
-        float EndorcementTrustFactor { get; set; }
+        float EndorcementTrustFactor { get; }
         void Endorce(Person person);
-        float Endorces(Person endorcer, Person receiver);
-        PersonData Get(Person person);
+        void Endorces(Person endorcer, Person receiver);
         float? GetTrust(Person person);
         float? GetMoney(Person person);
     }

@@ -12,20 +12,42 @@ namespace Trustcoin.Main
         public static readonly Command[] Commands = FindAll<Command>();
         private static readonly SmartCommand[] SmartCommands = FindAll<SmartCommand>();
 
-        public static readonly Network Network = new Network();
+        public static readonly Network Network = new Network(new NoLogger());
+        //public static readonly Network Network = new Network(new StopLogger(100));
 
         static void Main(string[] args)
         {
             Header1("Trustcoin");
+            foreach (var commands in args.Select(GetCommands))
+                RunCommands(commands);
             while (true)
+                RunCommands(ReadCommands());
+        }
+
+        private static void RunCommands(CommandMatch match)
+        {
+            RunCommand(match.PrimaryCommand, match.Arguments);
+            foreach (var command in match.PostCommands)
             {
-                var match = ReadCommands();
-                match.PrimaryCommand.Execute(match.Arguments);
-                foreach (var command in match.PostCommands)
-                {
-                    command.Execute();
-                }
+                RunCommand(command);
             }
+        }
+
+        private static void RunCommand(Command command, params string[] arguments)
+        {
+            Output(command, arguments);
+            command.Execute(arguments);
+        }
+
+        private static void Output(Command command, params string[] arguments)
+        {
+            Output();
+            Output($"{command.Name}: {string.Join(',', arguments)}/");
+        }
+
+        private static void Output(string line = null)
+        {
+            Console.WriteLine(line);
         }
 
         internal static void Header2(string caption)
@@ -52,15 +74,15 @@ namespace Trustcoin.Main
             Console.WriteLine(new string(underlineChar, caption.Length));
         }
 
-        private static CommandMatch ReadCommands()
-        {
-            var input = Ask("Write command");
-            return CommandMatch.Create(Commands.FirstOrDefault(cmd => cmd.Matches(input)))
-                ?? SmartCommands
-                .Select(sc => sc.Match(input))
-                .FirstOrDefault(sc => sc != null)
-            ?? CommandMatch.Create(new ListCommands());
-        }
+        private static CommandMatch ReadCommands() 
+            => GetCommands(Ask("Write command"));
+
+        private static CommandMatch GetCommands(string input) 
+            => CommandMatch.Create(Commands.FirstOrDefault(cmd => cmd.Matches(input)))
+                                                                 ?? SmartCommands
+                                                                     .Select(sc => sc.Match(input))
+                                                                     .FirstOrDefault(sc => sc != null)
+                                                                 ?? CommandMatch.Create(new ListCommands());
 
         private static TParent[] FindAll<TParent>()
             => GetTypesInNamespace<TParent>(Assembly.GetExecutingAssembly())
