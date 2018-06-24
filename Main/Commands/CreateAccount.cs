@@ -2,7 +2,7 @@
 
 namespace Trustcoin.Main.Commands
 {
-    public class AddPerson : Command
+    public class CreateAccount : Command
     {
         public void Execute(params string[] args)
         {
@@ -10,8 +10,8 @@ namespace Trustcoin.Main.Commands
             Program.Network.AddPerson(name);
         }
 
-        public string Name => "add";
+        public string Name => "create";
 
-        public char Short => '+';
+        public char Short => '*';
     }
 }

@@ -3,15 +3,15 @@ using Trustcoin.Story;
 
 namespace Trustcoin.Main.Commands
 {
-    public class EndorceArtefact : Command
+    public class Compliment : Command
     {
         public void Execute(params string[] args)
         {
-            var endorcerName = args.FirstOrDefault() ?? Program.Ask("Name endorcer");
+            var accountName = args.FirstOrDefault() ?? Program.Ask("Name account");
             var artefactName = args.SecondOrDefault() ?? Program.Ask("Name artefact");
-            var endorcer = Program.Network.Get(endorcerName);
+            var account = Program.Network.GetAccount(accountName);
             var artefact = Program.Network.GetArtefact(artefactName);
-            endorcer.Compliment(artefact);
+            account.Compliment(artefact);
         }
 
         public string Name => "like";

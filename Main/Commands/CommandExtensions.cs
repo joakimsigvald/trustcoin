@@ -7,15 +7,5 @@
 
         public static string Signature(this Command cmd)
             => $"{cmd.Short}={cmd.Name}";
-
-        public static CommandMatch Match(this SmartCommand cmd, string input)
-            => cmd.Short() == input[0]
-                ? new CommandMatch
-                {
-                    Arguments = input.Substring(1).Split(','),
-                    PrimaryCommand = cmd.PrimaryCommand(),
-                    PostCommands = cmd.PostCommands()
-                }
-                : null;
     }
 }

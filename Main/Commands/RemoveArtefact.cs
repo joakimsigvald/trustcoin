@@ -3,17 +3,17 @@ using Trustcoin.Story;
 
 namespace Trustcoin.Main.Commands
 {
-    public class AddArtefact : Command
+    public class RemoveArtefact : Command
     {
         public void Execute(params string[] args)
         {
             var personName = args.FirstOrDefault() ?? Program.Ask("Name person");
             var artefactName = args.SecondOrDefault() ?? Program.Ask("Write artefact name");
-            Program.Network.AddArtefact(personName, artefactName);
+            Program.Network.RemoveArtefact(personName, artefactName);
         }
 
-        public string Name => "add";
+        public string Name => "remove";
 
-        public char Short => '+';
+        public char Short => '-';
     }
 }

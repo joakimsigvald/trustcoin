@@ -3,17 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Trustcoin.Main.Commands;
-using Trustcoin.Story;
 
 namespace Trustcoin.Main
 {
     public class Program
     {
         public static readonly Command[] Commands = FindAll<Command>();
-        private static readonly SmartCommand[] SmartCommands = FindAll<SmartCommand>();
 
-        public static readonly Network Network = new Network(new NoLogger());
-        //public static readonly Network Network = new Network(new StopLogger(100));
+        private static readonly SmartCommand[] SmartCommands =
+            CreateSmartCommands(typeof(Quit), typeof(ListNodes))
+            .ToArray();
+
+        private static IEnumerable<SmartCommand> CreateSmartCommands(params Type[] excludedCommandTypes)
+            => Commands.Where(cmd => !excludedCommandTypes.Contains(cmd.GetType()))
+                .Select(cmd => new SmartCommand(cmd, ListNodes.Singleton));
+
+        public static readonly Network Network = new Network(new FactoryImpl(new NoLogger()));
 
         static void Main(string[] args)
         {

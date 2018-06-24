@@ -6,7 +6,7 @@ namespace Trustcoin.Main.Commands
     {
         public void Execute(params string[] args)
         {
-            Program.Header2("Trustcoin");
+            Program.Header2("Commands");
             foreach (var command in Program.Commands)
             {
                 Console.WriteLine(command.Signature());

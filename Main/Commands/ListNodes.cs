@@ -5,9 +5,11 @@ namespace Trustcoin.Main.Commands
 {
     public class ListNodes : Command
     {
+        public static readonly ListNodes Singleton = new ListNodes();
+
         public void Execute(params string[] args)
         {
-            Program.Header2("Participants");
+            Program.Header2("Accounts");
             Program.Network.Accounts
                 .ForEach(account => Console.WriteLine($"{account}"));
         }

@@ -7,13 +7,15 @@ namespace Trustcoin.Story
     public class PrivateAccount : Account, Peer
     {
         private readonly Logger _logger;
+        private readonly Factory _factory;
         private readonly Dictionary<Peer, PersonData> _peers = new Dictionary<Peer, PersonData>();
         private readonly List<Artefact> _myArtefacts = new List<Artefact>();
         private readonly List<Artefact> _knownArtefacts = new List<Artefact>();
 
-        public PrivateAccount(int id, string name, Logger logger)
+        public PrivateAccount(int id, string name, Logger logger, Factory factory)
         {
             _logger = logger;
+            _factory = factory;
             Id = id;
             Name = name;
         }
@@ -30,6 +32,24 @@ namespace Trustcoin.Story
             artefact.Owner = this;
             _myArtefacts.Add(artefact);
             InformPeers(peer => peer.GotArtefact(this, artefact));
+        }
+
+        public void RemoveArtefact(Artefact artefact)
+        {
+            artefact.Owner = null;
+            _myArtefacts.Remove(artefact);
+            InformPeers(peer => peer.LostArtefact(this, artefact));
+        }
+
+        public IEnumerable<Artefact> SplitArtefact(Artefact artefact, params string[] newNames)
+        {
+            RemoveArtefact(artefact);
+            var newArtefacts = newNames
+                .Select(_factory.CreateArtefact)
+                .ToArray();
+            newArtefacts
+                .ForEach(AddArtefact);
+            return newArtefacts;
         }
 
         public void Endorce(Peer receiver)
@@ -68,6 +88,15 @@ namespace Trustcoin.Story
                 RegisterArtefact(claimer, artefact);
             else
                 DisputeArtefact(owner, claimer, artefact);
+        }
+
+        public void LostArtefact(Peer claimer, Artefact artefact)
+        {
+            var knownArtefact = _knownArtefacts.Get(artefact);
+            var owner = knownArtefact?.Owner ?? claimer;
+            if (!claimer.Equals(owner))
+                owner = DisputeArtefact(owner, claimer, artefact);
+            UnregisterArtefact(owner, artefact);
         }
 
         public void Endorced(Peer endorcer, Peer receiver)
@@ -111,14 +140,35 @@ namespace Trustcoin.Story
             GetData(claimer).AddArtefact(artefact.Id, new ArtefactData());
         }
 
-        private void DisputeArtefact(Peer owner, Peer claimer, Artefact artefact)
+        private void UnregisterArtefact(Peer owner, Artefact artefact)
+        {
+            _knownArtefacts.Remove(artefact);
+            GetData(owner).RemoveArtefact(artefact.Id);
+        }
+
+        private Peer DisputeArtefact(
+            Peer owner,
+            Peer claimer,
+            Artefact artefact)
         {
             var ownerData = GetInitializedData(owner);
             var claimerData = GetInitializedData(claimer);
             ownerData.Doubt(ArtefactDisputeDoubtFactor);
             claimerData.Doubt(ArtefactDisputeDoubtFactor);
-            if (claimerData.Trust > ownerData.Trust)
-                claimerData.AddArtefact(artefact.Id, ownerData.RemoveArtefact(artefact.Id));
+            if (claimerData.Trust < ownerData.Trust)
+                return owner;
+            ChangeOwner(ownerData, claimer, claimerData, artefact);
+            return claimer;
+        }
+
+        private static void ChangeOwner(
+            PersonData ownerData, 
+            Peer claimer, 
+            PersonData claimerData, 
+            Artefact artefact)
+        {
+            artefact.Owner = claimer;
+            claimerData.AddArtefact(artefact.Id, ownerData.RemoveArtefact(artefact.Id));
         }
 
         private void InformPeers(Action<Peer> inform, params Peer[] excludedPeers)

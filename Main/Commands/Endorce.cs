@@ -9,13 +9,13 @@ namespace Trustcoin.Main.Commands
         {
             var sourceName = args.FirstOrDefault() ?? Program.Ask("Name source");
             var targetName = args.SecondOrDefault() ?? Program.Ask("Name target");
-            var source = Program.Network.Get(sourceName);
-            var target = Program.Network.Get(targetName);
-            source.Endorce(target);
+            var account = Program.Network.GetAccount(sourceName);
+            var peer = Program.Network.GetPeer(targetName);
+            account.Endorce(peer);
         }
 
         public string Name => "endorce";
 
-        public char Short => '*';
+        public char Short => '¨';
     }
 }
