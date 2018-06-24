@@ -2,7 +2,7 @@
   "profiles": {
     "Main": {
       "commandName": "Project",
-      "commandLineArgs": "+a +b +c *a,b *b,a *a,c *c,a *b,c *c,b"
+      "commandLineArgs": "+a +b +c *a,b *b,a *a,c *c,a *b,c *c,b :a,x :a,y :b,z ^c,x ^c,y ^c,z"
     }
   }
 }

@@ -1,6 +1,4 @@
-﻿using System.Linq;
-
-namespace Trustcoin.Main.Commands
+﻿namespace Trustcoin.Main.Commands
 {
     public static class CommandExtensions
     {
@@ -11,12 +9,12 @@ namespace Trustcoin.Main.Commands
             => $"{cmd.Short}={cmd.Name}";
 
         public static CommandMatch Match(this SmartCommand cmd, string input)
-            => cmd.Short == input[0]
+            => cmd.Short() == input[0]
                 ? new CommandMatch
                 {
                     Arguments = input.Substring(1).Split(','),
-                    PrimaryCommand = cmd.Commands[0],
-                    PostCommands = cmd.Commands.Skip(1)
+                    PrimaryCommand = cmd.PrimaryCommand(),
+                    PostCommands = cmd.PostCommands()
                 }
                 : null;
     }

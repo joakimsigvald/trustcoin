@@ -7,15 +7,10 @@ namespace Trustcoin.Story
     {
         private const float MaxTrust = 0.999f;
 
-        private readonly Person _subject;
-        private readonly Dictionary<Person, RelationData> _relations = new Dictionary<Person, RelationData>();
+        private readonly Dictionary<int, RelationData> _relations = new Dictionary<int, RelationData>();
+        private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
 
-        internal PersonData(Person subject)
-        {
-            _subject = subject;
-        }
-
-        internal bool IsEndorced { get; private set; }
+        internal bool IsEndorced { get; set; }
 
         internal float? Trust
         {
@@ -27,29 +22,39 @@ namespace Trustcoin.Story
             get; set;
         }
 
-        internal void Endorce()
-        {
-            IsEndorced = true;
-            Money = null;
-            IncreaseTrust();
-        }
-
-        internal RelationData Get(Person person)
-            => _relations.TryGetValue(person, out var nd)
+        internal RelationData GetRelation(int id)
+            => _relations.TryGetValue(id, out var nd)
                 ? nd
-                : _relations[person] = new RelationData();
+                : _relations[id] = new RelationData();
 
         internal void AddEndorcementMoney(PersonData endorcerData, RelationData relation)
         {
             Money += endorcerData.GenerateEndorcementMoney(relation);
         }
 
-        private void IncreaseTrust()
+        internal void Grace(float trustFactor)
         {
-            Trust += _subject.EndorcementTrustFactor * (MaxTrust - Trust);
+            Money = null;
+            Trust += trustFactor * (MaxTrust - Trust);
+        }
+
+        internal void Doubt(float doubtFactor)
+        {
+            Trust *= 1 - doubtFactor;
         }
 
         private float GenerateEndorcementMoney(RelationData relation)
             => (float)Math.Sqrt(Trust.Value * (1 - relation.Strength));
+
+        public void AddArtefact(int id, ArtefactData artefact)
+        {
+            _artefacts[id] = artefact;
+        }
+
+        public ArtefactData RemoveArtefact(int id)
+            => _artefacts.Drop(id);
+
+        public ArtefactData GetArtefact(int id)
+            => _artefacts.SafeGetValue(id);
     }
 }

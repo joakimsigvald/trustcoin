@@ -1,4 +1,5 @@
 ﻿using System;
+using Trustcoin.Story;
 
 namespace Trustcoin.Main.Commands
 {
@@ -7,13 +8,11 @@ namespace Trustcoin.Main.Commands
         public void Execute(params string[] args)
         {
             Program.Header2("Participants");
-            foreach (var node in Program.Network.Nodes)
-            {
-                Console.WriteLine($"{node}");
-            }
+            Program.Network.Accounts
+                .ForEach(account => Console.WriteLine($"{account}"));
         }
 
-        public string Name => "nodes";
+        public string Name => "accounts";
 
         public char Short => 'l';
     }

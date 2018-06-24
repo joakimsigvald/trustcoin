@@ -2,7 +2,7 @@ using System;
 
 namespace Trustcoin.Story
 {
-    public interface ILogger
+    public interface Logger
     {
         void Log(string message, ConsoleColor color = ConsoleColor.Cyan);
     }

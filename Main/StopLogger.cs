@@ -3,7 +3,7 @@ using Trustcoin.Story;
 
 namespace Trustcoin.Main
 {
-    public class StopLogger : ILogger
+    public class StopLogger : Logger
     {
         private readonly int _maxLogs;
         private int _logCount;

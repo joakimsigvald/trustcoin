@@ -3,6 +3,5 @@
     public interface SmartCommand
     {
         Command[] Commands { get; }
-        char Short { get; }
     }
 }

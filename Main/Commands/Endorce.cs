@@ -14,8 +14,8 @@ namespace Trustcoin.Main.Commands
             source.Endorce(target);
         }
 
-        public string Name => "like";
+        public string Name => "endorce";
 
-        public char Short => 'd';
+        public char Short => '*';
     }
 }
