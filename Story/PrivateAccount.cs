@@ -26,7 +26,9 @@ namespace Trustcoin.Story
         private float EndorcementTrustFactor { get; } = 0.1f;
         private float ArtefactEndorcementTrustFactor { get; } = 0.02f;
         private float ArtefactDisputeDoubtFactor { get; } = 0.1f;
-
+        private float OutlierThreshold { get; } = 0.1f;
+        private float OutlierDoubtFactor { get; } = 0.05f;
+        
         public void AddArtefact(Artefact artefact)
         {
             artefact.Owner = this;
@@ -87,7 +89,7 @@ namespace Trustcoin.Story
             if (claimer.Equals(owner))
                 RegisterArtefact(claimer, artefact);
             else
-                DisputeArtefact(owner, claimer, artefact);
+                QuestionOwnership(owner, claimer, artefact);
         }
 
         public void LostArtefact(Peer claimer, Artefact artefact)
@@ -95,7 +97,7 @@ namespace Trustcoin.Story
             var knownArtefact = _knownArtefacts.Get(artefact);
             var owner = knownArtefact?.Owner ?? claimer;
             if (!claimer.Equals(owner))
-                owner = DisputeArtefact(owner, claimer, artefact);
+                owner = QuestionOwnership(owner, claimer, artefact);
             UnregisterArtefact(owner, artefact);
         }
 
@@ -146,19 +148,18 @@ namespace Trustcoin.Story
             GetData(owner).RemoveArtefact(artefact.Id);
         }
 
-        private Peer DisputeArtefact(
+        private Peer QuestionOwnership(
             Peer owner,
             Peer claimer,
             Artefact artefact)
         {
             var ownerData = GetInitializedData(owner);
             var claimerData = GetInitializedData(claimer);
-            ownerData.Doubt(ArtefactDisputeDoubtFactor);
-            claimerData.Doubt(ArtefactDisputeDoubtFactor);
-            if (claimerData.Trust < ownerData.Trust)
-                return owner;
-            ChangeOwner(ownerData, claimer, claimerData, artefact);
-            return claimer;
+            var leastTrustedData = new[] {claimerData, ownerData}.OrderBy(data => data.Trust).First();
+            if (leastTrustedData == ownerData)
+                ChangeOwner(ownerData, claimer, claimerData, artefact);
+            leastTrustedData.Doubt(ArtefactDisputeDoubtFactor);
+            return artefact.Owner;
         }
 
         private static void ChangeOwner(
@@ -239,9 +240,44 @@ namespace Trustcoin.Story
             => $"{method}: {Name}=>{subject} ({string.Join(',', whosAsking.Select(wa => wa.Name))})";
 
         private float? GetMedian(Peer target, Func<Peer, float?> getValue, params Peer[] whosAsking)
-            => GetPeers(whosAsking.Concat(new[] {this, target}).ToArray()).Select(p => GetWeightedValue(p, getValue))
-                .ToList()
+        {
+            var peerWeightedValues = GetPeers(whosAsking.Concat(new[] {this, target}).ToArray())
+                .Select(p => (peer: p, weightedValue: GetWeightedValue(p, getValue)))
+                .ToArray();
+            var median = peerWeightedValues
+                .Select(tuple => tuple.weightedValue)
                 .Median();
+            if (median.HasValue)
+            {
+                var peerValues = peerWeightedValues
+                    .Where(pwv => pwv.weightedValue.Item2.HasValue)
+                    .Select(pwv => (peer: pwv.peer, value: pwv.weightedValue.Item2.Value))
+                    .ToArray();
+                ReduceTrustForOutliers(peerValues, median.Value);
+            }
+            return median;
+        }
+
+        private void ReduceTrustForOutliers((Peer peer, float value)[] peerValues, float median)
+        {
+            var outliers = peerValues
+                .Select(pv => (peer: pv.peer, dif: Difference(pv.value, median)))
+                .Where(pd => pd.dif > OutlierThreshold)
+                .ToArray();
+            outliers.ForEach(ReduceTrustForOutlier);
+        }
+
+        private void ReduceTrustForOutlier((Peer peer, float dif) outlier)
+        {
+            var data = GetData(outlier.peer);
+            data.Doubt(OutlierDoubtFactor * outlier.dif);
+        }
+
+        private static float Difference(float v1, float v2)
+            => v1 == v2 ? 0 
+            : v1 == 0 || v2 == 0 
+            ? 1 
+            : 1 - Math.Min(v1 / v2, v2 / v1);
 
         private IEnumerable<Peer> GetPeers(params Peer[] excludedPeers)
             => _peers.Keys.Except(excludedPeers);
