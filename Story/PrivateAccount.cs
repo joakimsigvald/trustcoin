@@ -6,15 +6,13 @@ namespace Trustcoin.Story
 {
     public class PrivateAccount : Account, Peer
     {
-        private readonly Logger _logger;
         private readonly Factory _factory;
         private readonly Dictionary<Peer, PersonData> _peers = new Dictionary<Peer, PersonData>();
         private readonly List<Artefact> _myArtefacts = new List<Artefact>();
         private readonly List<Artefact> _knownArtefacts = new List<Artefact>();
 
-        public PrivateAccount(int id, string name, Logger logger, Factory factory)
+        public PrivateAccount(int id, string name, Factory factory)
         {
-            _logger = logger;
             _factory = factory;
             Id = id;
             Name = name;
@@ -75,7 +73,7 @@ namespace Trustcoin.Story
             InformPeers(peer => peer.Complimented(this, artefact), receiver);
         }
 
-        public float? GetMoney(Peer person)
+        public (float, float) GetMoney(Peer person)
             => GetData(person).Money;
 
         public void GotArtefact(Peer claimer, Artefact artefact)
@@ -181,15 +179,12 @@ namespace Trustcoin.Story
 
         private void AddMoneyToEndorcementReceiver(Peer endorcer, Peer receiver, RelationData relation)
         {
-            var addition = GetData(endorcer).Trust * (1 - relation.Strength);
-            GetData(receiver).AddMoney(addition, () => ComputeInitialMoney(receiver));
+            var addition = (GetData(endorcer).Trust, 1 - relation.Strength);
+            GetData(receiver).AddMoney(addition, () => EstimateMoney(receiver, this));
         }
 
-        private float ComputeInitialMoney(Peer receiver)
-            => EstimateMoney(receiver, this) ?? 0;
-
         private string ShowMoney()
-            => $"$: {EstimateMoney(this)}";
+            => $"$: {EstimateMoney(this).Item2}";
 
         private string ShowPeers()
             => $"knows: ({string.Join(',', GetPeers().Select(ShowPeer))})";
@@ -205,35 +200,40 @@ namespace Trustcoin.Story
 
         private IEnumerable<Artefact> Artefacts => _myArtefacts.OrderBy(a => a.Name);
 
-        private float? EstimateMoney(Peer target, params Peer[] whosAsking)
-        {
-            _logger.Log(EstimationFootprint(nameof(EstimateMoney), target, whosAsking));
-            return GetMedian(target, peer => peer.GetMoney(target), whosAsking);
-        }
+        private (float, float) EstimateMoney(Peer target, params Peer[] whosAsking) 
+            => GetMedian(target, peer => peer.GetMoney(target), whosAsking);
 
-        private string EstimationFootprint(string method, Peer target, params Peer[] whosAsking)
-            => Footprint(method, target.Name, whosAsking);
-
-        private string Footprint(string method, string subject, params Peer[] whosAsking)
-            => $"{method}: {Name}=>{subject} ({string.Join(',', whosAsking.Select(wa => wa.Name))})";
-
-        private float? GetMedian(Peer target, Func<Peer, float?> getValue, params Peer[] whosAsking)
+        private (float, float) GetMedian(Peer target, Func<Peer, (float, float)> getValue, params Peer[] whosAsking)
         {
             var peerWeightedValues = GetPeers(whosAsking.Concat(new[] {this, target}).ToArray())
                 .Select(p => (peer: p, weightedValue: GetWeightedValue(p, getValue)))
+                .Where(x => x.weightedValue.Item1 > 0)
                 .ToArray();
-            var median = peerWeightedValues
-                .Select(tuple => tuple.weightedValue)
-                .Median();
-            if (median.HasValue)
-            {
+            var weightedValues = peerWeightedValues
+                .Select(x => x.weightedValue)
+                .ToArray();
+            var median = weightedValues.Median();
+            if (!median.HasValue)
+                return (0, 0);
                 var peerValues = peerWeightedValues
-                    .Where(pwv => pwv.weightedValue.Item2.HasValue)
-                    .Select(pwv => (peer: pwv.peer, value: pwv.weightedValue.Item2.Value))
+                    .Select(pwv => (peer: pwv.peer, value: pwv.weightedValue.Item2))
                     .ToArray();
                 ReduceTrustForOutliers(peerValues, median.Value);
-            }
-            return median;
+            var reliability = ComputeReliability(median.Value, weightedValues);
+            return (reliability, median.Value);
+        }
+
+        private static float ComputeReliability(float median, IList<(float, float)> weightedVaues)
+        {
+            if (!weightedVaues.Any())
+                return 0;
+            var sumOfWeights = weightedVaues.Sum(wv => wv.Item1);
+            var strength = sumOfWeights / (1 + sumOfWeights);
+            if (median == 0)
+                return strength;
+            var weightedStandardDeviation =
+                (float)Math.Sqrt(weightedVaues.Sum(wv => wv.Item1 * Math.Pow(wv.Item2 - median, 2)) / sumOfWeights);
+            return strength * weightedStandardDeviation / median;
         }
 
         private void ReduceTrustForOutliers((Peer peer, float value)[] peerValues, float median)
@@ -260,12 +260,15 @@ namespace Trustcoin.Story
         private IEnumerable<Peer> GetPeers(params Peer[] excludedPeers)
             => _peers.Keys.Except(excludedPeers).Where(p => GetData(p).Trust > 0);
 
-        private (float, float?) GetWeightedValue(Peer peer, Func<Peer, float?> getValue)
+        private (float, float) GetWeightedValue(Peer peer, Func<Peer, (float, float)> getValue)
             => GetWeightedValue(GetData(peer).Trust, peer, getValue);
 
-        private static (float, float?) GetWeightedValue(float? weight, Peer peer, Func<Peer, float?> getValue)
-            => weight.HasValue
-                ? (weight.Value, getValue(peer))
-                : (0f, (float?) null);
+        private static (float, float) GetWeightedValue(float? trust, Peer peer, Func<Peer, (float, float)> getValue)
+        {
+            if (!trust.HasValue)
+                return (0, 0);
+            var reliableValue = getValue(peer);
+            return (reliableValue.Item1 * trust.Value, reliableValue.Item2);
+        }
     }
 }

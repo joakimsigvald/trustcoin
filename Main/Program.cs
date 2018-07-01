@@ -18,7 +18,7 @@ namespace Trustcoin.Main
             => Commands.Where(cmd => !excludedCommandTypes.Contains(cmd.GetType()))
                 .Select(cmd => new SmartCommand(cmd, ListNodes.Singleton));
 
-        public static readonly Network Network = new Network(new FactoryImpl(new NoLogger()));
+        public static readonly Network Network = new Network(new FactoryImpl());
 
         static void Main(string[] args)
         {

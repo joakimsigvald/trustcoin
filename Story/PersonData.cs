@@ -7,6 +7,7 @@ namespace Trustcoin.Story
     internal class PersonData
     {
         private const float MaxTrust = 0.999f;
+        private const float ReliabilityChangeFactor = 0.1f;
 
         private readonly Dictionary<int, RelationData> _relations = new Dictionary<int, RelationData>();
         private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
@@ -19,7 +20,7 @@ namespace Trustcoin.Story
             private set;
         }
 
-        internal float? Money
+        internal (float, float) Money
         {
             get;
             private set;
@@ -33,14 +34,21 @@ namespace Trustcoin.Story
         internal IEnumerable<ArtefactData> Artefacts
             => _artefacts.Values.OrderBy(a => a.Name);
 
-        internal void AddMoney(float addition, Func<float> initialize)
+        internal void AddMoney((float, float) addition, Func<(float, float)> initialize)
         {
-            Money = (Money ?? initialize()) + addition;
+            var newEstimation = initialize();
+            if (newEstimation.Item1 > Money.Item1)
+                Money = newEstimation;
+            var addedValue = addition.Item2;
+            var newValue = Money.Item2 + addedValue;
+            var k = ReliabilityChangeFactor * addedValue / newValue;
+            var newReliablilty = k * addition.Item1 + (1 - k) * Money.Item1;
+            Money = (newReliablilty, newValue);
         }
 
         internal void Grace(float trustFactor)
         {
-            Money = null;
+            Money = (0, 0);
             Trust += trustFactor * (MaxTrust - Trust);
         }
 
