@@ -6,7 +6,6 @@ namespace Trustcoin.Story
     {
         int Id { get; }
         string Name { get; }
-        float? GetTrust(Peer person);
         float? GetMoney(Peer person);
     }
 }

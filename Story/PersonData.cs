@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Trustcoin.Story
 {
@@ -12,14 +13,16 @@ namespace Trustcoin.Story
 
         internal bool IsEndorced { get; set; }
 
-        internal float? Trust
+        internal float Trust
         {
-            get; set;
+            get;
+            private set;
         }
 
         internal float? Money
         {
-            get; set;
+            get;
+            private set;
         }
 
         internal RelationData GetRelation(int id)
@@ -27,9 +30,12 @@ namespace Trustcoin.Story
                 ? nd
                 : _relations[id] = new RelationData();
 
-        internal void AddEndorcementMoney(PersonData endorcerData, RelationData relation)
+        internal IEnumerable<ArtefactData> Artefacts
+            => _artefacts.Values.OrderBy(a => a.Name);
+
+        internal void AddMoney(float addition, Func<float> initialize)
         {
-            Money += endorcerData.GenerateEndorcementMoney(relation);
+            Money = (Money ?? initialize()) + addition;
         }
 
         internal void Grace(float trustFactor)
@@ -42,9 +48,6 @@ namespace Trustcoin.Story
         {
             Trust *= 1 - doubtFactor;
         }
-
-        private float GenerateEndorcementMoney(RelationData relation)
-            => (float)Math.Sqrt(Trust.Value * (1 - relation.Strength));
 
         public void AddArtefact(int id, ArtefactData artefact)
         {

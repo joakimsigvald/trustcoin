@@ -22,5 +22,8 @@ namespace Trustcoin.Story
 
         public override int GetHashCode()
             => Id;
+
+        public override string ToString()
+            => Name;
     }
 }

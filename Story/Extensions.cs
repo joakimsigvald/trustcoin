@@ -6,13 +6,11 @@ namespace Trustcoin.Story
 {
     public static class Extensions
     {
-        public static float? Median(this IEnumerable<(float, float?)> weightedValues)
-        {
-            return Median(weightedValues
-                .Where(wv => wv.Item2.HasValue)
-                .Select(wv => (wv.Item1, wv.Item2.Value))
-                .ToArray());
-        }
+        public static float? Median(this IEnumerable<(float, float?)> weightedValues) 
+            => Median(weightedValues
+            .Where(wv => wv.Item2.HasValue && wv.Item1 > 0)
+            .Select(wv => (wv.Item1, wv.Item2.Value))
+            .ToArray());
 
         public static float? Median(this IList<(float, float)> weightedValues)
         {
