@@ -6,6 +6,6 @@ namespace Trustcoin.Story
     {
         int Id { get; }
         string Name { get; }
-        (float, float) GetMoney(Peer person, params Peer[] whosAsking);
+        ConfidenceValue GetMoney(Peer person, Guid? beforeTransaction, params Peer[] whosAsking);
     }
 }

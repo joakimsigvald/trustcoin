@@ -8,24 +8,19 @@ namespace Trustcoin.Story
     {
         private const float MaxAmount = 1_000_000_000;
         private const float MaxTrust = 0.999f;
-        private const float ReliabilityChangeFactor = 0.1f;
+        private const float ConfidenceChangeFactor = 0.1f;
+
+        private readonly IDictionary<Guid, ConfidenceValue> _moneyBeforeTransaction =
+            new Dictionary<Guid, ConfidenceValue>();
 
         private readonly Dictionary<int, RelationData> _relations = new Dictionary<int, RelationData>();
         private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
 
         internal bool IsEndorced { get; set; }
 
-        internal float Trust
-        {
-            get;
-            private set;
-        }
+        internal float Trust { get; private set; }
 
-        internal (float, float) Money
-        {
-            get;
-            private set;
-        }
+        internal ConfidenceValue Money { get; private set; }
 
         internal RelationData GetRelation(int id)
             => _relations.TryGetValue(id, out var nd)
@@ -35,20 +30,21 @@ namespace Trustcoin.Story
         internal IEnumerable<ArtefactData> Artefacts
             => _artefacts.Values.OrderBy(a => a.Name);
 
-        internal void AddMoney((float, float) addition)
+        internal void AddMoney(ConfidenceValue addition, Guid transaction)
         {
-            var addedValue = addition.Item2;
-            var newValue = Money.Item2 + addedValue;
-            var k = ReliabilityChangeFactor * addedValue / newValue;
-            var newReliablilty = k * addition.Item1 + (1 - k) * Money.Item1;
-            var possessableAmount = MaxAmount * newReliablilty;
+            _moneyBeforeTransaction[transaction] = Money;
+            var addedValue = addition.Value;
+            var newValue = Money.Value + addedValue;
+            var k = ConfidenceChangeFactor * addedValue / newValue;
+            var newConfidence = k * addition.Confidence + (1 - k) * Money.Confidence;
+            var possessableAmount = MaxAmount * newConfidence;
             var newPossessableValue = Math.Min(possessableAmount, newValue);
-            Money = (newReliablilty, newPossessableValue);
+            Money = new ConfidenceValue(newConfidence, newPossessableValue);
         }
 
         internal void Grace(float trustFactor)
         {
-            Money = (0, 0);
+            Money = new ConfidenceValue();
             Trust += trustFactor * (MaxTrust - Trust);
         }
 
@@ -68,11 +64,17 @@ namespace Trustcoin.Story
         public ArtefactData GetArtefact(int id)
             => _artefacts.SafeGetValue(id);
 
-        public void UpdateMoney(Func<(float, float)> estimate)
+        public void UpdateMoney(Func<ConfidenceValue> estimate)
         {
             var newEstimation = estimate();
-            if (newEstimation.Item1 > Money.Item1)
+            if (newEstimation.Confidence > Money.Confidence)
                 Money = newEstimation;
         }
+
+        public ConfidenceValue GetMoney(Guid? beforeTransaction)
+            => beforeTransaction.HasValue &&
+               _moneyBeforeTransaction.TryGetValue(beforeTransaction.Value, out ConfidenceValue moneyBefore)
+                ? moneyBefore
+                : Money;
     }
 }
