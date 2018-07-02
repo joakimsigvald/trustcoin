@@ -4,6 +4,14 @@ using System.Linq;
 
 namespace Trustcoin.Story
 {
+    /// <summary>
+    /// MAX_AMOUNT: 1_000_000_000
+    /// Transferable amount: reliability^2*possession
+    /// Possessable amount: MAX_AMOUNT^reliability
+    /// 
+    /// On each money update, possession is truncated by possessable amount
+    /// </summary>
+
     public class PrivateAccount : Account, Peer
     {
         private readonly Factory _factory;
@@ -73,8 +81,12 @@ namespace Trustcoin.Story
             InformPeers(peer => peer.Complimented(this, artefact), receiver);
         }
 
-        public (float, float) GetMoney(Peer person)
-            => GetData(person).Money;
+        public (float, float) GetMoney(Peer target, params Peer[] whosAsking)
+        {
+            var data = GetData(target);
+            data.UpdateMoney(() => EstimateMoney(target, whosAsking));
+            return data.Money;
+        }
 
         public void GotArtefact(Peer claimer, Artefact artefact)
         {
@@ -180,7 +192,9 @@ namespace Trustcoin.Story
         private void AddMoneyToEndorcementReceiver(Peer endorcer, Peer receiver, RelationData relation)
         {
             var addition = (GetData(endorcer).Trust, 1 - relation.Strength);
-            GetData(receiver).AddMoney(addition, () => EstimateMoney(receiver, this));
+            var data = GetData(receiver);
+            data.UpdateMoney(() => EstimateMoney(receiver));
+            data.AddMoney(addition);
         }
 
         private string ShowMoney()
@@ -200,12 +214,15 @@ namespace Trustcoin.Story
 
         private IEnumerable<Artefact> Artefacts => _myArtefacts.OrderBy(a => a.Name);
 
-        private (float, float) EstimateMoney(Peer target, params Peer[] whosAsking) 
-            => GetMedian(target, peer => peer.GetMoney(target), whosAsking);
+        private (float, float) EstimateMoney(Peer target, params Peer[] whosAsking)
+        {
+            whosAsking = whosAsking.Append(this).ToArray();
+            return GetMedian(target, peer => peer.GetMoney(target, whosAsking), whosAsking);
+        }
 
         private (float, float) GetMedian(Peer target, Func<Peer, (float, float)> getValue, params Peer[] whosAsking)
         {
-            var peerWeightedValues = GetPeers(whosAsking.Concat(new[] {this, target}).ToArray())
+            var peerWeightedValues = GetPeers(whosAsking.Append(target).ToArray())
                 .Select(p => (peer: p, weightedValue: GetWeightedValue(p, getValue)))
                 .Where(x => x.weightedValue.Item1 > 0)
                 .ToArray();
