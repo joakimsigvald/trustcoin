@@ -211,14 +211,15 @@ namespace Trustcoin.Story
                 .ToArray();
             var weightedValues = peerWeightedValues
                 .Select(x => x.weightedValue)
+                .Select(twv => (twv.Item1 * twv.Item2.Item1, twv.Item2.Item2))
                 .ToArray();
             var median = weightedValues.Median();
             if (!median.HasValue)
                 return (0, 0);
-                var peerValues = peerWeightedValues
-                    .Select(pwv => (peer: pwv.peer, value: pwv.weightedValue.Item2))
-                    .ToArray();
-                ReduceTrustForOutliers(peerValues, median.Value);
+            var peerValues = peerWeightedValues
+                .Select(pwv => (peer: pwv.peer, value: pwv.weightedValue.Item2))
+                .ToArray();
+            ReduceTrustForOutliers(peerValues, median.Value);
             var reliability = ComputeReliability(median.Value, weightedValues);
             return (reliability, median.Value);
         }
@@ -236,19 +237,22 @@ namespace Trustcoin.Story
             return strength * weightedStandardDeviation / median;
         }
 
-        private void ReduceTrustForOutliers((Peer peer, float value)[] peerValues, float median)
+        private void ReduceTrustForOutliers((Peer peer, (float, float) confidenceValue)[] peerValues, float median)
         {
             var outliers = peerValues
-                .Select(pv => (peer: pv.peer, dif: Difference(pv.value, median)))
+                .Select(pv => (
+                peer: pv.peer, 
+                confidence: pv.confidenceValue.Item1, 
+                dif: Difference(pv.confidenceValue.Item2, median)))
                 .Where(pd => pd.dif > OutlierThreshold)
                 .ToArray();
             outliers.ForEach(ReduceTrustForOutlier);
         }
 
-        private void ReduceTrustForOutlier((Peer peer, float dif) outlier)
+        private void ReduceTrustForOutlier((Peer peer, float confidence, float dif) outlier)
         {
             var data = GetData(outlier.peer);
-            data.Doubt(OutlierDoubtFactor * outlier.dif);
+            data.Doubt(OutlierDoubtFactor * outlier.confidence * outlier.dif);
         }
 
         private static float Difference(float v1, float v2)
@@ -260,15 +264,15 @@ namespace Trustcoin.Story
         private IEnumerable<Peer> GetPeers(params Peer[] excludedPeers)
             => _peers.Keys.Except(excludedPeers).Where(p => GetData(p).Trust > 0);
 
-        private (float, float) GetWeightedValue(Peer peer, Func<Peer, (float, float)> getValue)
+        private (float, (float, float)) GetWeightedValue(Peer peer, Func<Peer, (float, float)> getValue)
             => GetWeightedValue(GetData(peer).Trust, peer, getValue);
 
-        private static (float, float) GetWeightedValue(float? trust, Peer peer, Func<Peer, (float, float)> getValue)
+        private static (float, (float, float)) GetWeightedValue(float? trust, Peer peer, Func<Peer, (float, float)> getValue)
         {
             if (!trust.HasValue)
-                return (0, 0);
+                return (0, (0, 0));
             var reliableValue = getValue(peer);
-            return (reliableValue.Item1 * trust.Value, reliableValue.Item2);
+            return (reliableValue.Item1, (trust.Value, reliableValue.Item2));
         }
     }
 }
