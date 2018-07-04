@@ -16,6 +16,10 @@ namespace Trustcoin.Story
         private readonly Dictionary<int, RelationData> _relations = new Dictionary<int, RelationData>();
         private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
 
+        public PersonData(string name)
+            => Name = name;
+
+        internal string Name { get; set; }
         internal bool IsEndorced { get; set; }
 
         internal float Trust { get; private set; }

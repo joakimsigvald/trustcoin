@@ -9,8 +9,8 @@ namespace Trustcoin.Main.Commands
         {
             var accountName = args.FirstOrDefault() ?? Program.Ask("Name account");
             var artefactName = args.SecondOrDefault() ?? Program.Ask("Name artefact");
-            var account = Program.Network.GetAccount(accountName);
-            var artefact = Program.Network.GetArtefact(artefactName);
+            var account = Program.TestBench.GetAccount(accountName);
+            var artefact = Program.TestBench.GetArtefact(artefactName);
             account.Compliment(artefact);
         }
 

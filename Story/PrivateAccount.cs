@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trustcoin.Story.Messages;
 
 namespace Trustcoin.Story
 {
@@ -13,13 +14,15 @@ namespace Trustcoin.Story
     public class PrivateAccount : Account, Peer
     {
         private readonly Factory _factory;
-        private readonly Dictionary<Peer, PersonData> _peers = new Dictionary<Peer, PersonData>();
+        private readonly Network _network;
+        private readonly Dictionary<int, PersonData> _peers = new Dictionary<int, PersonData>();
         private readonly List<Artefact> _myArtefacts = new List<Artefact>();
         private readonly List<Artefact> _knownArtefacts = new List<Artefact>();
 
-        public PrivateAccount(int id, string name, Factory factory)
+        public PrivateAccount(int id, string name, Factory factory, Network network)
         {
             _factory = factory;
+            _network = network;
             Id = id;
             Name = name;
         }
@@ -34,16 +37,16 @@ namespace Trustcoin.Story
         
         public void AddArtefact(Artefact artefact)
         {
-            artefact.Owner = this;
+            artefact.OwnerId = Id;
             _myArtefacts.Add(artefact);
-            InformPeers((peer, transaction) => peer.GotArtefact(this, artefact));
+            InformPeers(new GotArtefact(Id, artefact));
         }
 
         public void RemoveArtefact(Artefact artefact)
         {
-            artefact.Owner = null;
+            artefact.OwnerId = null;
             _myArtefacts.Remove(artefact);
-            InformPeers((peer, transaction) => peer.LostArtefact(this, artefact));
+            InformPeers(new LostArtefact(Id, artefact));
         }
 
         public IEnumerable<Artefact> SplitArtefact(Artefact artefact, params string[] newNames)
@@ -57,78 +60,80 @@ namespace Trustcoin.Story
             return newArtefacts;
         }
 
-        public void Endorce(Peer receiver)
+        public void Endorce(int receiverId)
         {
-            var receiverData = GetData(receiver);
+            var receiverData = GetData(receiverId);
             if (receiverData.IsEndorced) return;
 
             receiverData.IsEndorced = true;
             receiverData.Grace(EndorcementTrustFactor);
-            InformPeers((peer, transaction) => peer.Endorced(this, receiver, transaction));
+            InformPeers(new Endorcement(Id, receiverId));
         }
 
         public void Compliment(Artefact artefact)
         {
-            var receiver = artefact.Owner;
-            var receiverData = GetData(receiver);
+            var receiverId = artefact.KnownOwnerId;
+            var receiverData = GetData(receiverId);
             var artefactData = receiverData.GetArtefact(artefact.Id);
             if (artefactData.IsEndorced) return;
 
             artefactData.IsEndorced = true;
             receiverData.Grace(ArtefactEndorcementTrustFactor);
-            InformPeers((peer, transaction) => peer.Complimented(this, artefact, transaction));
+            InformPeers(new Compliment(Id, artefact.Id));
         }
 
-        public ConfidenceValue GetMoney(Peer target, Guid? beforeTransaction = null, params Peer[] whosAsking)
+        public ConfidenceValue GetMoney(int targetId, Guid? beforeTransaction = null, params int[] whosAsking)
         {
-            var data = GetData(target);
-            data.UpdateMoney(() => EstimateMoney(target, beforeTransaction, whosAsking));
+            var data = GetData(targetId);
+            data.UpdateMoney(() => EstimateMoney(targetId, beforeTransaction, whosAsking));
             return data.GetMoney(beforeTransaction);
         }
 
-        public void GotArtefact(Peer claimer, Artefact artefact)
+        public void Receive(GotArtefact _)
         {
-            var knownArtefact = _knownArtefacts.Get(artefact);
-            var owner = knownArtefact?.Owner ?? claimer;
-            if (claimer.Equals(owner))
-                RegisterArtefact(claimer, artefact);
+            var knownArtefact = _knownArtefacts.Get(_.Artefact);
+            var ownerId = knownArtefact?.OwnerId ?? _.OwnerId;
+            if (ownerId == _.OwnerId)
+                RegisterArtefact(_.OwnerId, _.Artefact);
             else
-                QuestionOwnership(owner, claimer, artefact);
+                QuestionOwnership(ownerId, _.OwnerId, _.Artefact);
         }
 
-        public void LostArtefact(Peer claimer, Artefact artefact)
+        public void Receive(LostArtefact _)
         {
-            var knownArtefact = _knownArtefacts.Get(artefact);
-            var owner = knownArtefact?.Owner ?? claimer;
-            if (!claimer.Equals(owner))
-                owner = QuestionOwnership(owner, claimer, artefact);
-            UnregisterArtefact(owner, artefact);
+            var knownArtefact = _knownArtefacts.Get(_.Artefact);
+            var ownerId = knownArtefact?.OwnerId ?? _.OwnerId;
+            if (ownerId != _.OwnerId)
+                ownerId = QuestionOwnership(ownerId, _.OwnerId, _.Artefact);
+            if (ownerId == _.OwnerId)
+                UnregisterArtefact(ownerId, _.Artefact);
         }
 
-        public void Endorced(Peer endorcer, Peer receiver, Guid transaction)
+        public void Receive(Endorcement _, Guid transaction)
         {
-            if (receiver == this)
+            if (_.ReceiverId == Id)
                 return;
-            var relation = GetData(endorcer).GetRelation(receiver.Id);
+            var relation = GetData(_.EndorcerId).GetRelation(_.ReceiverId);
             if (relation.IsEndorcer)
                 return;
             relation.IsEndorcer = true;
             relation.Strengthen();
-            AddMoneyToEndorcementReceiver(endorcer, receiver, relation, transaction);
+            AddMoneyToEndorcementReceiver(_.EndorcerId, _.ReceiverId, relation, transaction);
         }
 
-        public void Complimented(Peer endorcer, Artefact artefact, Guid transaction)
+        public void Receive(Compliment _, Guid transaction)
         {
-            var owner = artefact.Owner;
-            if (owner == this)
+            var artefact = _knownArtefacts.SingleOrDefault(art => art.Id == _.ArtefactId);
+            if (artefact?.OwnerId == null || artefact.OwnerId == Id)
                 return;
-            var relation = GetData(endorcer).GetRelation(owner.Id);
-            var artefactData = GetData(owner).GetArtefact(artefact.Id);
-            if (artefactData == null || artefactData.IsEndorcedBy(endorcer))
+            var ownerId = artefact.KnownOwnerId;
+            var relation = GetData(_.ComplementerId).GetRelation(ownerId);
+            var artefactData = GetData(ownerId).GetArtefact(_.ArtefactId);
+            if (artefactData == null || artefactData.IsComplementedBy(_.ComplementerId))
                 return;
-            artefactData.Endorced(endorcer);
+            artefactData.Complimented(_.ComplementerId);
             relation.Strengthen();
-            AddMoneyToEndorcementReceiver(endorcer, owner, relation, transaction);
+            AddMoneyToEndorcementReceiver(_.ComplementerId, ownerId, relation, transaction);
         }
 
         public override string ToString()
@@ -143,76 +148,76 @@ namespace Trustcoin.Story
         public override int GetHashCode()
             => Id;
 
-        private void RegisterArtefact(Peer claimer, Artefact artefact)
+        private void RegisterArtefact(int claimerId, Artefact artefact)
         {
             _knownArtefacts.AddUnique(artefact);
-            GetData(claimer).AddArtefact(artefact.Id, new ArtefactData(artefact));
+            GetData(claimerId).AddArtefact(artefact.Id, new ArtefactData(artefact));
         }
 
-        private void UnregisterArtefact(Peer owner, Artefact artefact)
+        private void UnregisterArtefact(int ownerId, Artefact artefact)
         {
             _knownArtefacts.Remove(artefact);
-            GetData(owner).RemoveArtefact(artefact.Id);
+            GetData(ownerId).RemoveArtefact(artefact.Id);
         }
 
-        private Peer QuestionOwnership(
-            Peer owner,
-            Peer claimer,
+        private int QuestionOwnership(
+            int ownerId,
+            int claimerId,
             Artefact artefact)
         {
-            var ownerData = GetData(owner);
-            var claimerData = GetData(claimer);
+            var ownerData = GetData(ownerId);
+            var claimerData = GetData(claimerId);
             var leastTrustedData = new[] {claimerData, ownerData}.OrderBy(data => data.Trust).First();
             if (leastTrustedData == ownerData)
-                ChangeOwner(ownerData, claimer, claimerData, artefact);
+                ChangeOwner(ownerData, claimerId, claimerData, artefact);
             leastTrustedData.Doubt(ArtefactDisputeDoubtFactor);
-            return artefact.Owner;
+            return artefact.KnownOwnerId;
         }
 
         private static void ChangeOwner(
             PersonData ownerData, 
-            Peer claimer, 
+            int claimerId, 
             PersonData claimerData, 
             Artefact artefact)
         {
-            artefact.Owner = claimer;
+            artefact.OwnerId = claimerId;
             claimerData.AddArtefact(artefact.Id, ownerData.RemoveArtefact(artefact.Id));
         }
 
-        private void InformPeers(Action<Peer, Guid> inform)
+        private void InformPeers<TContent>(TContent content)
         {
             var transaction = CreateTransaction();
-            GetPeers().ForEach(peer => inform(peer, transaction));
+            GetPeers().ForEach(peer => _network.Send(new Message<TContent>(peer, content, transaction)));
         }
 
         private static Guid CreateTransaction()
             => Guid.NewGuid();
 
-        private PersonData GetData(Peer person)
+        private PersonData GetData(int peerId)
         {
-            if (person.Equals(this))
+            if (peerId == Id)
                 throw new ArgumentException("Cannot have self as peer");
-            return _peers.SafeGetValue(person) ?? (_peers[person] = new PersonData());
+            return _peers.SafeGetValue(peerId) ?? (_peers[peerId] = new PersonData(_network.GetName(peerId)));
         }
 
-        private void AddMoneyToEndorcementReceiver(Peer endorcer, Peer receiver, RelationData relation, Guid transaction)
+        private void AddMoneyToEndorcementReceiver(int endorcerId, int receiverId, RelationData relation, Guid transaction)
         {
-            var addition = new ConfidenceValue(GetData(endorcer).Trust, 1 - relation.Strength);
-            var data = GetData(receiver);
-            data.UpdateMoney(() => EstimateMoney(receiver, transaction));
+            var addition = new ConfidenceValue(GetData(endorcerId).Trust, 1 - relation.Strength);
+            var data = GetData(receiverId);
+            data.UpdateMoney(() => EstimateMoney(receiverId, transaction));
             data.AddMoney(addition, transaction);
         }
 
         private string ShowMoney()
-            => $"$: {EstimateMoney(this).Value}";
+            => $"$: {EstimateMoney(Id).Value}";
 
         private string ShowPeers()
             => $"knows: ({string.Join(',', GetPeers().Select(ShowPeer))})";
 
-        private string ShowPeer(Peer peer)
+        private string ShowPeer(int peerId)
         {
-            var peerData = GetData(peer);
-            return $"{peer.Name}: {peerData.Trust} [{string.Join(',', peerData.Artefacts)}]";
+            var peerData = GetData(peerId);
+            return $"{peerData.Name}: {peerData.Trust} [{string.Join(',', peerData.Artefacts)}]";
         }
 
         private string ShowArtefacts()
@@ -220,15 +225,15 @@ namespace Trustcoin.Story
 
         private IEnumerable<Artefact> Artefacts => _myArtefacts.OrderBy(a => a.Name);
 
-        private ConfidenceValue EstimateMoney(Peer target, Guid? beforeTransaction = null, params Peer[] whosAsking)
+        private ConfidenceValue EstimateMoney(int targetId, Guid? beforeTransaction = null, params int[] whosAsking)
         {
-            whosAsking = whosAsking.Append(this).ToArray();
-            return GetMedian(target, peer => peer.GetMoney(target, beforeTransaction, whosAsking), whosAsking);
+            whosAsking = whosAsking.Append(Id).ToArray();
+            return GetMedian(targetId, peer => _network.GetMoney(peer, targetId, beforeTransaction, whosAsking), whosAsking);
         }
 
-        private ConfidenceValue GetMedian(Peer target, Func<Peer, ConfidenceValue> getValue, params Peer[] whosAsking)
+        private ConfidenceValue GetMedian(int targetId, Func<int, ConfidenceValue> getValue, params int[] whosAsking)
         {
-            var peerWeightedValues = GetPeers(whosAsking.Append(target).ToArray())
+            var peerWeightedValues = GetPeers(whosAsking.Append(targetId).ToArray())
                 .Select(p => (peer: p, weightedValue: GetWeightedValue(p, getValue)))
                 .Where(x => x.weightedValue.Trust > 0)
                 .ToArray();
@@ -240,7 +245,7 @@ namespace Trustcoin.Story
             if (!median.HasValue)
                 return new ConfidenceValue();
             var peerValues = peerWeightedValues
-                .Select(pwv => (peer: pwv.peer, value: (pwv.weightedValue.Confidence, pwv.weightedValue.Value)))
+                .Select(pwv => (pwv.peer, value: (pwv.weightedValue.Confidence, pwv.weightedValue.Value)))
                 .ToArray();
             ReduceTrustForOutliers(peerValues, median.Value);
             var confidence = ComputeConfidence(median.Value, weightedValues);
@@ -260,11 +265,11 @@ namespace Trustcoin.Story
             return strength * weightedStandardDeviation / median;
         }
 
-        private void ReduceTrustForOutliers((Peer peer, (float, float) confidenceValue)[] peerValues, float median)
+        private void ReduceTrustForOutliers((int peerId, (float, float) confidenceValue)[] peerValues, float median)
         {
             var outliers = peerValues
                 .Select(pv => (
-                peer: pv.peer, 
+                pv.peerId, 
                 confidence: pv.confidenceValue.Item1, 
                 dif: Difference(pv.confidenceValue.Item2, median)))
                 .Where(pd => pd.dif > OutlierThreshold)
@@ -272,9 +277,9 @@ namespace Trustcoin.Story
             outliers.ForEach(ReduceTrustForOutlier);
         }
 
-        private void ReduceTrustForOutlier((Peer peer, float confidence, float dif) outlier)
+        private void ReduceTrustForOutlier((int peerId, float confidence, float dif) outlier)
         {
-            var data = GetData(outlier.peer);
+            var data = GetData(outlier.peerId);
             data.Doubt(OutlierDoubtFactor * outlier.confidence * outlier.dif);
         }
 
@@ -284,15 +289,15 @@ namespace Trustcoin.Story
             ? 1 
             : 1 - Math.Min(v1 / v2, v2 / v1);
 
-        private IEnumerable<Peer> GetPeers(params Peer[] excludedPeers)
-            => _peers.Keys.Except(excludedPeers).Where(p => GetData(p).Trust > 0);
+        private IEnumerable<int> GetPeers(params int[] excludedPeerIds)
+            => _peers.Keys.Except(excludedPeerIds).Where(p => GetData(p).Trust > 0);
 
-        private TrustConfidenceValue GetWeightedValue(Peer peer, Func<Peer, ConfidenceValue> getValue)
-            => GetWeightedValue(GetData(peer).Trust, peer, getValue);
+        private TrustConfidenceValue GetWeightedValue(int peerId, Func<int, ConfidenceValue> getValue)
+            => GetWeightedValue(GetData(peerId).Trust, peerId, getValue);
 
-        private static TrustConfidenceValue GetWeightedValue(float? trust, Peer peer, Func<Peer, ConfidenceValue> getValue) 
+        private static TrustConfidenceValue GetWeightedValue(float? trust, int peerId, Func<int, ConfidenceValue> getValue) 
             => !trust.HasValue 
             ? new TrustConfidenceValue() 
-            : new TrustConfidenceValue(trust.Value, getValue(peer));
+            : new TrustConfidenceValue(trust.Value, getValue(peerId));
     }
 }

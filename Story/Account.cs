@@ -4,7 +4,7 @@ namespace Trustcoin.Story
 {
     public interface Account : Person
     {
-        void Endorce(Peer person);
+        void Endorce(int person);
         void Compliment(Artefact artefact);
         void AddArtefact(Artefact artefact);
         void RemoveArtefact(Artefact artefact);

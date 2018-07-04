@@ -12,7 +12,8 @@ namespace Trustcoin.Story
 
         public int Id { get; }
         public string Name { get; }
-        public Peer Owner { get; set; }
+        public int? OwnerId { get; set; }
+        public int KnownOwnerId => OwnerId ?? throw new InvalidOperationException("Artefact has no owner");
 
         public bool Equals(Artefact other)
             => other != null && other.Id == Id;

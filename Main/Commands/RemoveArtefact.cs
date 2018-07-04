@@ -9,7 +9,7 @@ namespace Trustcoin.Main.Commands
         {
             var personName = args.FirstOrDefault() ?? Program.Ask("Name person");
             var artefactName = args.SecondOrDefault() ?? Program.Ask("Write artefact name");
-            Program.Network.RemoveArtefact(personName, artefactName);
+            Program.TestBench.RemoveArtefact(personName, artefactName);
         }
 
         public string Name => "remove";

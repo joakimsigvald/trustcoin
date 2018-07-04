@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Trustcoin.Main.Commands;
+using Trustcoin.Story;
 
 namespace Trustcoin.Main
 {
@@ -18,7 +19,7 @@ namespace Trustcoin.Main
             => Commands.Where(cmd => !excludedCommandTypes.Contains(cmd.GetType()))
                 .Select(cmd => new SmartCommand(cmd, ListNodes.Singleton));
 
-        public static readonly Network Network = new Network(new FactoryImpl());
+        public static readonly TestBench TestBench = new TestBench(new FactoryImpl(new InstantNetwork()));
 
         static void Main(string[] args)
         {

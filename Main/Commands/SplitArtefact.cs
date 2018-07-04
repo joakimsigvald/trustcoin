@@ -12,7 +12,7 @@ namespace Trustcoin.Main.Commands
             var newNames = args.Length > 2 
                 ? args.Skip(2).ToArray() 
                 : Program.Ask("Write new names comma-separated").Split(',');
-            Program.Network.SplitArtefact(personName, artefactName, newNames);
+            Program.TestBench.SplitArtefact(personName, artefactName, newNames);
         }
 
         public string Name => "split";

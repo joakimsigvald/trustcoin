@@ -9,9 +9,9 @@ namespace Trustcoin.Main.Commands
         {
             var sourceName = args.FirstOrDefault() ?? Program.Ask("Name source");
             var targetName = args.SecondOrDefault() ?? Program.Ask("Name target");
-            var account = Program.Network.GetAccount(sourceName);
-            var peer = Program.Network.GetPeer(targetName);
-            account.Endorce(peer);
+            var account = Program.TestBench.GetAccount(sourceName);
+            var peer = Program.TestBench.GetPeer(targetName);
+            account.Endorce(peer.Id);
         }
 
         public string Name => "endorce";

@@ -5,6 +5,7 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <AssemblyName>Trustcoin.Main</AssemblyName>
     <RootNamespace>Trustcoin.Main</RootNamespace>
+    <LangVersion>7.1</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

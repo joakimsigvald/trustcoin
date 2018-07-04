@@ -4,7 +4,7 @@ namespace Trustcoin.Story
 {
     internal class ArtefactData
     {
-        private readonly List<Person> _endorcers = new List<Person>();
+        private readonly List<int> _complimenters = new List<int>();
 
         public ArtefactData(Artefact artefact)
             => Name = artefact.Name;
@@ -12,12 +12,12 @@ namespace Trustcoin.Story
         public string Name { get; }
         public bool IsEndorced { get; set; }
 
-        public bool IsEndorcedBy(Person person)
-            => _endorcers.Contains(person);
+        public bool IsComplementedBy(int person)
+            => _complimenters.Contains(person);
 
-        public void Endorced(Person endorcer)
+        public void Complimented(int endorcer)
         {
-            _endorcers.Add(endorcer);
+            _complimenters.Add(endorcer);
         }
 
         public override string ToString()

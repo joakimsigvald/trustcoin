@@ -7,7 +7,7 @@ namespace Trustcoin.Main.Commands
         public void Execute(params string[] args)
         {
             var name = args.FirstOrDefault() ?? Program.Ask("Write name");
-            Program.Network.AddPerson(name);
+            Program.TestBench.AddPerson(name);
         }
 
         public string Name => "create";

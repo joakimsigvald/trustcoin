@@ -4,13 +4,13 @@ using Trustcoin.Story;
 
 namespace Trustcoin.Main
 {
-    public class Network
+    public class TestBench
     {
         private readonly Factory _factory;
         private readonly List<PrivateAccount> _accounts = new List<PrivateAccount>();
         private readonly List<Artefact> _artefacts = new List<Artefact>();
 
-        public Network(Factory factory) => _factory = factory;
+        public TestBench(Factory factory) => _factory = factory;
 
         public void AddPerson(string name)
         {

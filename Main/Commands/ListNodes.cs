@@ -10,7 +10,7 @@ namespace Trustcoin.Main.Commands
         public void Execute(params string[] args)
         {
             Program.Header2("Accounts");
-            Program.Network.Accounts
+            Program.TestBench.Accounts
                 .ForEach(account => Console.WriteLine($"{account}"));
         }
 
