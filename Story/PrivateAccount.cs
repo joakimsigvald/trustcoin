@@ -8,9 +8,18 @@ using Trustcoin.Story.Types;
 namespace Trustcoin.Story
 {
     /// <summary>
-    /// Transferable amount: confidence^2*possession
-    /// 
-    /// On each money update, possession is truncated by possessable amount
+    /// TODO
+    /// * Transactions
+    /// - Transferable amount: confidence^2*possession
+    /// - On each money update, possession is truncated by possessable amount
+    /// * Share/Update/Set "constants"
+    /// * Set/Reset trust
+    /// * Negative trust
+    /// * Proof of autenticity (digital signature)
+    /// * Anonymous transactions through third party
+    /// * Test coverage
+    /// * Bigger scenarious
+    /// * Fraud scenarious
     /// </summary>
 
     public class PrivateAccount : Account, Peer
