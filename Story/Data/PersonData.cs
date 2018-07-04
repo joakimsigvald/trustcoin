@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trustcoin.Story.Types;
 
-namespace Trustcoin.Story
+namespace Trustcoin.Story.Data
 {
     internal class PersonData
     {

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Trustcoin.Story.Data;
 using Trustcoin.Story.Messages;
+using Trustcoin.Story.Types;
 
 namespace Trustcoin.Story
 {

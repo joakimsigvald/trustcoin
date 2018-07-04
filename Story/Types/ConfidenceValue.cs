@@ -1,4 +1,4 @@
-namespace Trustcoin.Story
+namespace Trustcoin.Story.Types
 {
     public struct ConfidenceValue
     {

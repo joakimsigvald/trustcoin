@@ -1,5 +1,6 @@
 ﻿using System;
 using Trustcoin.Story.Messages;
+using Trustcoin.Story.Types;
 
 namespace Trustcoin.Story
 {

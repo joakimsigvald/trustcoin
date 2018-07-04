@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Trustcoin.Story
+namespace Trustcoin.Story.Data
 {
     internal class ArtefactData
     {

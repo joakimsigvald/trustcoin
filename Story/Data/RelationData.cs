@@ -1,4 +1,4 @@
-﻿namespace Trustcoin.Story
+﻿namespace Trustcoin.Story.Data
 {
     public class RelationData
     {
