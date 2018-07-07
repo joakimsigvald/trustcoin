@@ -10,5 +10,6 @@ namespace Trustcoin.Story
         void Send<TContent>(Message<TContent> message);
         ConfidenceValue GetMoney(int perspective, int target, Guid? beforeTransaction, int[] whosAsking);
         string GetName(int peerId);
+        Transaction<MoneyTransfer> ConfirmTransaction(int initiatorId, int receiverId, Transaction<MoneyTransfer> transaction);
     }
 }

@@ -19,8 +19,8 @@ namespace Trustcoin.Story
             return WeightedSum(lowerMedian, upperMedian) / SumOfWeights(lowerMedian, upperMedian);
         }
 
-        public static TItem SecondOrDefault<TItem>(this IEnumerable<TItem> items)
-            => items.Skip(1).FirstOrDefault();
+        public static TItem NthOrDefault<TItem>(this IEnumerable<TItem> items, int index)
+            => items.Skip(index).FirstOrDefault();
 
         public static void ForEach<TItem>(this IEnumerable<TItem> items, Action<TItem> action)
             => items.AsList().ForEach(action);

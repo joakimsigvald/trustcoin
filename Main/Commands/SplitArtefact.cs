@@ -7,8 +7,8 @@ namespace Trustcoin.Main.Commands
     {
         public void Execute(params string[] args)
         {
-            var personName = args.FirstOrDefault() ?? Program.Ask("Name person");
-            var artefactName = args.SecondOrDefault() ?? Program.Ask("Write artefact name");
+            var personName = args.NthOrDefault(0) ?? Program.Ask("Name person");
+            var artefactName = args.NthOrDefault(1) ?? Program.Ask("Write artefact name");
             var newNames = args.Length > 2 
                 ? args.Skip(2).ToArray() 
                 : Program.Ask("Write new names comma-separated").Split(',');

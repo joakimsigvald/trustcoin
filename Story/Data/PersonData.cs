@@ -16,16 +16,15 @@ namespace Trustcoin.Story.Data
 
         private readonly Dictionary<int, RelationData> _relations = new Dictionary<int, RelationData>();
         private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
+        private ConfidenceValue _money;
 
-        public PersonData(string name)
+        internal PersonData(string name)
             => Name = name;
 
         internal string Name { get; set; }
         internal bool IsEndorced { get; set; }
 
         internal float Trust { get; private set; }
-
-        internal ConfidenceValue Money { get; private set; }
 
         internal RelationData GetRelation(int id)
             => _relations.TryGetValue(id, out var nd)
@@ -35,21 +34,23 @@ namespace Trustcoin.Story.Data
         internal IEnumerable<ArtefactData> Artefacts
             => _artefacts.Values.OrderBy(a => a.Name);
 
+
+        internal float MaxTransferableAmount => _money.Confidence * MaxTransferedAmount;
+
         internal void AddMoney(ConfidenceValue addition, Guid transaction)
         {
-            _moneyBeforeTransaction[transaction] = Money;
+            _moneyBeforeTransaction[transaction] = _money;
             var addedValue = addition.Value;
-            var newValue = Money.Value + addedValue;
+            var newValue = _money.Value + addedValue;
             var k = ConfidenceChangeFactor * addedValue / newValue;
-            var newConfidence = k * addition.Confidence + (1 - k) * Money.Confidence;
+            var newConfidence = k * addition.Confidence + (1 - k) * _money.Confidence;
             var possessableAmount = MaxAmount * newConfidence;
             var newPossessableValue = Math.Min(possessableAmount, newValue);
-            Money = new ConfidenceValue(newConfidence, newPossessableValue);
+            _money = new ConfidenceValue(newConfidence, newPossessableValue);
         }
 
         internal void Grace(float trustFactor)
         {
-            Money = new ConfidenceValue();
             Trust += trustFactor * (MaxTrust - Trust);
         }
 
@@ -58,28 +59,30 @@ namespace Trustcoin.Story.Data
             Trust *= 1 - doubtFactor;
         }
 
-        public void AddArtefact(int id, ArtefactData artefact)
+        internal void AddArtefact(int id, ArtefactData artefact)
         {
             _artefacts[id] = artefact;
         }
 
-        public ArtefactData RemoveArtefact(int id)
+        internal ArtefactData RemoveArtefact(int id)
             => _artefacts.Drop(id);
 
-        public ArtefactData GetArtefact(int id)
+        internal ArtefactData GetArtefact(int id)
             => _artefacts.SafeGetValue(id);
 
-        public void UpdateMoney(Func<ConfidenceValue> estimate)
+        internal void UpdateMoney(Func<ConfidenceValue> estimate)
         {
             var newEstimation = estimate();
-            if (newEstimation.Confidence > Money.Confidence)
-                Money = newEstimation;
+            if (newEstimation.Confidence > _money.Confidence)
+                _money = newEstimation;
         }
 
-        public ConfidenceValue GetMoney(Guid? beforeTransaction)
+        internal ConfidenceValue GetMoney(Guid? beforeTransaction)
             => beforeTransaction.HasValue &&
                _moneyBeforeTransaction.TryGetValue(beforeTransaction.Value, out ConfidenceValue moneyBefore)
                 ? moneyBefore
-                : Money;
+                : _money;
+
+        private float MaxTransferedAmount => _money.Confidence * _money.Value;
     }
 }

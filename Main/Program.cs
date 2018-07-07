@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Trustcoin.Main.Commands;
-using Trustcoin.Story;
-
 namespace Trustcoin.Main
 {
     public class Program

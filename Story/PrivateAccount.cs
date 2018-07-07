@@ -16,14 +16,32 @@ namespace Trustcoin.Story
     /// * Set/Reset trust
     /// * Negative trust
     /// * Proof of autenticity (digital signature)
-    /// * Anonymous transactions through third party
+    /// * Anonymous transactions through third party (transaction mediator)
+    /// - transaction mediator issue tickets to both parts:
+    /// - one part buys the ticket, the other part uses her ticket to retreive the same amount
+    /// - the transactino mediator may charge a fee (based on percentage of amount, absolute or combination)
+    /// - the algorithm automatically chooses the most trusted/cheapest mediato(s) common to both parts og the transaction
     /// * Test coverage
     /// * Bigger scenarious
     /// * Fraud scenarious
+    /// * Three types of actors:
+    /// - private: can make transactions
+    /// - regional transaction mediator: Can issue tickets to two known actors, one is sold to one part and the other can be used to retreive the same amount of money from the partner
+    /// - global transaction mediator: Only connects with transaction mediators and attempt to connect with all other global transaction mediators
+    /// - this way the longest chain between two actors is: private-regional-global-global-regional-private
+    /// - one global transaction mediator can issue tickets that is delegated through the chain to the private actors
+    /// * Binary dimensions to position all actors, to facilitate finding common mediators
+    /// - purpose: To facilitate search of common chain of mediators between two parties
+    /// - objective: make actors spread out evenly, but make actors that interact alot cluster together, so that distance shows amount of interaction
+    /// - 128 binary dimensions gives an enourmeous information space where the nodes are spread out (2^128 voxels)
+    /// - on each interaction, a random dimension is flipped for the initiator, then a random common dimension where they are different is selected and flipped for the initiator
+    /// * Implement real digital signatures
+    /// * Handle synchronizatino - single threaded accounts
     /// </summary>
 
     public class PrivateAccount : Account, Peer
     {
+        private readonly List<Transaction> _handledTransactions = new List<Transaction>();
         private readonly Factory _factory;
         private readonly Network _network;
         private readonly Dictionary<int, PersonData> _peers = new Dictionary<int, PersonData>();
@@ -41,8 +59,10 @@ namespace Trustcoin.Story
         public int Id { get; }
         public string Name { get; }
         private float EndorcementTrustFactor { get; } = 0.1f;
+        private float MoneyTransferTrustFactor { get; } = 0.1f;
         private float ArtefactEndorcementTrustFactor { get; } = 0.02f;
         private float ArtefactDisputeDoubtFactor { get; } = 0.1f;
+        private float InvalidTransferDoubtFactor { get; } = 0.1f;
         private float OutlierThreshold { get; } = 0.1f;
         private float OutlierDoubtFactor { get; } = 0.05f;
         
@@ -50,14 +70,14 @@ namespace Trustcoin.Story
         {
             artefact.OwnerId = Id;
             _myArtefacts.Add(artefact);
-            InformPeers(new GotArtefact(Id, artefact));
+            InformPeers(_factory.CreateTransaction(new GotArtefact(Id, artefact)));
         }
 
         public void RemoveArtefact(Artefact artefact)
         {
             artefact.OwnerId = null;
             _myArtefacts.Remove(artefact);
-            InformPeers(new LostArtefact(Id, artefact));
+            InformPeers(_factory.CreateTransaction(new LostArtefact(Id, artefact)));
         }
 
         public IEnumerable<Artefact> SplitArtefact(Artefact artefact, params string[] newNames)
@@ -71,6 +91,18 @@ namespace Trustcoin.Story
             return newArtefacts;
         }
 
+        public void SendMoney(int receiverId, float amount)
+        {
+            var transfer = new MoneyTransfer(Id, receiverId, amount);
+            var transaction = _factory.CreateTransaction(transfer);
+            var signedTransaction = transaction.Sign(Id); 
+            var confirmedTransaction = _network.ConfirmTransaction(Id, receiverId, signedTransaction);
+            if (!confirmedTransaction.IsSignedBy(receiverId))
+                throw new ReceiverDeniedTransaction();
+            InformPeers(confirmedTransaction);
+            RetrieveData(receiverId).Grace(MoneyTransferTrustFactor);
+        }
+
         public void Endorce(int receiverId)
         {
             var receiverData = GetData(receiverId);
@@ -78,7 +110,7 @@ namespace Trustcoin.Story
 
             receiverData.IsEndorced = true;
             receiverData.Grace(EndorcementTrustFactor);
-            InformPeers(new Endorcement(Id, receiverId));
+            InformPeers(_factory.CreateTransaction(new Endorcement(Id, receiverId)));
         }
 
         public void Compliment(Artefact artefact)
@@ -90,62 +122,117 @@ namespace Trustcoin.Story
 
             artefactData.IsEndorced = true;
             receiverData.Grace(ArtefactEndorcementTrustFactor);
-            InformPeers(new Compliment(Id, artefact.Id));
+            InformPeers(_factory.CreateTransaction(new Compliment(Id, artefact.Id)));
         }
 
         public ConfidenceValue GetMoney(int targetId, Guid? beforeTransaction = null, params int[] whosAsking)
-        {
-            var data = GetData(targetId);
-            data.UpdateMoney(() => EstimateMoney(targetId, beforeTransaction, whosAsking));
-            return data.GetMoney(beforeTransaction);
-        }
+            => RetrieveData(targetId, beforeTransaction, whosAsking)
+            .GetMoney(beforeTransaction);
 
-        public void Receive(GotArtefact _)
+        public void Receive(Transaction<GotArtefact> _)
         {
-            var knownArtefact = _knownArtefacts.Get(_.Artefact);
-            var ownerId = knownArtefact?.OwnerId ?? _.OwnerId;
-            if (ownerId == _.OwnerId)
-                RegisterArtefact(_.OwnerId, _.Artefact);
+            var gotArtefact = _.Content;
+            var knownArtefact = _knownArtefacts.Get(gotArtefact.Artefact);
+            var ownerId = knownArtefact?.OwnerId ?? gotArtefact.OwnerId;
+            if (ownerId == gotArtefact.OwnerId)
+                RegisterArtefact(gotArtefact.OwnerId, gotArtefact.Artefact);
             else
-                QuestionOwnership(ownerId, _.OwnerId, _.Artefact);
+                QuestionOwnership(ownerId, gotArtefact.OwnerId, gotArtefact.Artefact);
         }
 
-        public void Receive(LostArtefact _)
+        public void Receive(Transaction<LostArtefact> _)
         {
-            var knownArtefact = _knownArtefacts.Get(_.Artefact);
-            var ownerId = knownArtefact?.OwnerId ?? _.OwnerId;
-            if (ownerId != _.OwnerId)
-                ownerId = QuestionOwnership(ownerId, _.OwnerId, _.Artefact);
-            if (ownerId == _.OwnerId)
-                UnregisterArtefact(ownerId, _.Artefact);
+            var lostArtefact = _.Content;
+            var knownArtefact = _knownArtefacts.Get(lostArtefact.Artefact);
+            var ownerId = knownArtefact?.OwnerId ?? lostArtefact.OwnerId;
+            if (ownerId != lostArtefact.OwnerId)
+                ownerId = QuestionOwnership(ownerId, lostArtefact.OwnerId, lostArtefact.Artefact);
+            if (ownerId == lostArtefact.OwnerId)
+                UnregisterArtefact(ownerId, lostArtefact.Artefact);
         }
 
-        public void Receive(Endorcement _, Guid transaction)
+        public void Receive(Transaction<Endorcement> _)
         {
-            if (_.ReceiverId == Id)
+            var endorcement = _.Content;
+            if (endorcement.ReceiverId == Id)
                 return;
-            var relation = GetData(_.EndorcerId).GetRelation(_.ReceiverId);
+            var relation = GetData(endorcement.EndorcerId).GetRelation(endorcement.ReceiverId);
             if (relation.IsEndorcer)
                 return;
             relation.IsEndorcer = true;
             relation.Strengthen();
-            AddMoneyToEndorcementReceiver(_.EndorcerId, _.ReceiverId, relation, transaction);
+            AddMoneyToEndorcementReceiver(endorcement.EndorcerId, endorcement.ReceiverId, relation, _.Id);
         }
 
-        public void Receive(Compliment _, Guid transaction)
+        public void Receive(Transaction<Compliment> _)
         {
-            var artefact = _knownArtefacts.SingleOrDefault(art => art.Id == _.ArtefactId);
+            var compliment = _.Content;
+            var artefact = _knownArtefacts.SingleOrDefault(art => art.Id == compliment.ArtefactId);
             if (artefact?.OwnerId == null || artefact.OwnerId == Id)
                 return;
             var ownerId = artefact.KnownOwnerId;
-            var relation = GetData(_.ComplementerId).GetRelation(ownerId);
-            var artefactData = GetData(ownerId).GetArtefact(_.ArtefactId);
-            if (artefactData == null || artefactData.IsComplementedBy(_.ComplementerId))
+            var relation = GetData(compliment.ComplementerId).GetRelation(ownerId);
+            var artefactData = GetData(ownerId).GetArtefact(compliment.ArtefactId);
+            if (artefactData == null || artefactData.IsComplementedBy(compliment.ComplementerId))
                 return;
-            artefactData.Complimented(_.ComplementerId);
+            artefactData.Complimented(compliment.ComplementerId);
             relation.Strengthen();
-            AddMoneyToEndorcementReceiver(_.ComplementerId, ownerId, relation, transaction);
+            AddMoneyToEndorcementReceiver(compliment.ComplementerId, ownerId, relation, _.Id);
         }
+
+        public void Receive(Transaction<MoneyTransfer> _)
+        {
+            if (_handledTransactions.Contains(_))
+                return;
+            _handledTransactions.Add(_);
+            var transfer = _.Content;
+            if (!_.IsSignedBy(transfer.SenderId) || !_.IsSignedBy(transfer.ReceiverId))
+                return;
+            if (transfer.SenderId == Id)
+                RegisterMoneyTransferSent(transfer, _);
+            else if (transfer.ReceiverId == Id)
+                RegisterMoneyTransferReceived(transfer, _);
+            else RegisterThirdPartMoneyTransfer(transfer, _);
+        }
+
+        private void RegisterThirdPartMoneyTransfer(MoneyTransfer transfer, Transaction _)
+        {
+            var senderData = RetrieveData(transfer.SenderId);
+            var receiverData = RetrieveData(transfer.ReceiverId);
+            if (senderData.MaxTransferableAmount < transfer.Amount)
+            {
+                senderData.Doubt(InvalidTransferDoubtFactor * (1 - senderData.MaxTransferableAmount / transfer.Amount));
+                return;
+            }
+            senderData.GetRelation(transfer.ReceiverId).Strengthen();
+            receiverData.GetRelation(transfer.SenderId).Strengthen();
+            senderData.AddMoney(new ConfidenceValue(1, -transfer.Amount), _.Id);
+            receiverData.AddMoney(new ConfidenceValue(1, transfer.Amount), _.Id);
+        }
+
+        private void RegisterMoneyTransferReceived(MoneyTransfer transfer, Transaction _)
+        {
+            RetrieveData(transfer.SenderId).AddMoney(new ConfidenceValue(1, -transfer.Amount), _.Id);
+        }
+
+        private void RegisterMoneyTransferSent(MoneyTransfer transfer, Transaction _)
+        {
+            RetrieveData(transfer.ReceiverId).AddMoney(new ConfidenceValue(1, transfer.Amount), _.Id);
+        }
+
+        public Transaction<MoneyTransfer> ConfirmMoneyTransfer(Transaction<MoneyTransfer> transaction)
+        {
+            var transferAccepted = transaction.IsSignedBy(transaction.Content.SenderId)
+                                   &&  IsValidTransfer(transaction.Content);
+            if (!transferAccepted)
+                return transaction;
+            var signedTransaction = transaction.Sign(Id);
+            InformPeers(signedTransaction);
+            return signedTransaction;
+        }
+
+        private bool IsValidTransfer(MoneyTransfer transfer)
+            => RetrieveData(transfer.SenderId).MaxTransferableAmount >= transfer.Amount;
 
         public override string ToString()
             => $"{Name}: {ShowMoney()}, {ShowArtefacts()}, {ShowPeers()}";
@@ -195,27 +282,15 @@ namespace Trustcoin.Story
             claimerData.AddArtefact(artefact.Id, ownerData.RemoveArtefact(artefact.Id));
         }
 
-        private void InformPeers<TContent>(TContent content)
+        private void InformPeers<TContent>(Transaction<TContent> transaction)
         {
-            var transaction = CreateTransaction();
-            GetPeers().ForEach(peer => _network.Send(new Message<TContent>(peer, content, transaction)));
-        }
-
-        private static Guid CreateTransaction()
-            => Guid.NewGuid();
-
-        private PersonData GetData(int peerId)
-        {
-            if (peerId == Id)
-                throw new ArgumentException("Cannot have self as peer");
-            return _peers.SafeGetValue(peerId) ?? (_peers[peerId] = new PersonData(_network.GetName(peerId)));
+            GetPeers().ForEach(peer => _network.Send(new Message<TContent>(peer, transaction)));
         }
 
         private void AddMoneyToEndorcementReceiver(int endorcerId, int receiverId, RelationData relation, Guid transaction)
         {
             var addition = new ConfidenceValue(GetData(endorcerId).Trust, 1 - relation.Strength);
-            var data = GetData(receiverId);
-            data.UpdateMoney(() => EstimateMoney(receiverId, transaction));
+            var data = RetrieveData(receiverId, transaction);
             data.AddMoney(addition, transaction);
         }
 
@@ -233,6 +308,20 @@ namespace Trustcoin.Story
 
         private string ShowArtefacts()
             => $"has: ({string.Join(',', Artefacts)})";
+
+        private PersonData RetrieveData(int peerId, Guid? beforeTransaction = null, params int[] whosAsking)
+        {
+            var data = GetData(peerId);
+            data.UpdateMoney(() => EstimateMoney(peerId, beforeTransaction, whosAsking));
+            return data;
+        }
+
+        private PersonData GetData(int peerId)
+        {
+            if (peerId == Id)
+                throw new ArgumentException("Cannot have self as peer");
+            return _peers.SafeGetValue(peerId) ?? (_peers[peerId] = new PersonData(_network.GetName(peerId)));
+        }
 
         private IEnumerable<Artefact> Artefacts => _myArtefacts.OrderBy(a => a.Name);
 

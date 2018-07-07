@@ -9,5 +9,6 @@ namespace Trustcoin.Story
         void AddArtefact(Artefact artefact);
         void RemoveArtefact(Artefact artefact);
         IEnumerable<Artefact> SplitArtefact(Artefact artefact, params string[] newNames);
+        void SendMoney(int receiverId, float amount);
     }
 }

@@ -16,19 +16,22 @@ namespace Trustcoin.Main
         public void Send<TContent>(Message<TContent> message)
         {
             var peer = _peers[message.ReceiverId];
-            switch (message.Content)
+            switch (message.Transaction.Content)
             {
-                case GotArtefact g:
+                case Transaction<GotArtefact> g:
                     peer.Receive(g);
                     break;
-                case LostArtefact l:
+                case Transaction<LostArtefact> l:
                     peer.Receive(l);
                     break;
-                case Endorcement e:
-                    peer.Receive(e, message.Transaction);
+                case Transaction<Endorcement> e:
+                    peer.Receive(e);
                     break;
-                case Compliment c:
-                    peer.Receive(c, message.Transaction);
+                case Transaction<Compliment> c:
+                    peer.Receive(c);
+                    break;
+                case Transaction<MoneyTransfer> m:
+                    peer.Receive(m);
                     break;
             }
         }
@@ -41,5 +44,11 @@ namespace Trustcoin.Main
 
         public string GetName(int peerId)
             => _peers[peerId].Name;
+
+        public Transaction<MoneyTransfer> ConfirmTransaction(int initiatorId, int receiverId, Transaction<MoneyTransfer> transaction)
+        {
+            var peer = _peers[receiverId];
+            return peer.ConfirmMoneyTransfer(transaction);
+        }
     }
 }

@@ -53,5 +53,12 @@ namespace Trustcoin.Main
 
         private PrivateAccount Get(string name)
             => _accounts.Find(n => n.Name == name);
+
+        public void TransferMoney(string senderName, string receiverName, float amount)
+        {
+            var sender = GetAccount(senderName);
+            var receiver = GetAccount(receiverName);
+            sender.SendMoney(receiver.Id, amount);
+        }
     }
 }

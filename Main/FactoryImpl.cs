@@ -18,5 +18,11 @@ namespace Trustcoin.Main
             _network.Register(account);
             return account;
         }
+
+        public Transaction<TContent> CreateTransaction<TContent>(TContent content)
+            => new Transaction<TContent>(content);
+
+        public Transaction CreateTransaction()
+            => new Transaction();
     }
 }
