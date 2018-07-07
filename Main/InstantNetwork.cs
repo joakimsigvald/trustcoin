@@ -13,10 +13,10 @@ namespace Trustcoin.Main
         public void Register(Peer peer)
             => _peers[peer.Id] = peer;
 
-        public void Send<TContent>(Message<TContent> message)
+        public void Send<TContent>(int receiverId, Transaction<TContent> transaction)
         {
-            var peer = _peers[message.ReceiverId];
-            switch (message.Transaction.Content)
+            var peer = _peers[receiverId];
+            switch (transaction.Content)
             {
                 case Transaction<GotArtefact> g:
                     peer.Receive(g);
@@ -30,8 +30,11 @@ namespace Trustcoin.Main
                 case Transaction<Compliment> c:
                     peer.Receive(c);
                     break;
-                case Transaction<MoneyTransfer> m:
-                    peer.Receive(m);
+                case Transaction<MoneyTransferInitiated> i:
+                    peer.Receive(i);
+                    break;
+                case Transaction<MoneyTransferAccepted> a:
+                    peer.Receive(a);
                     break;
             }
         }
@@ -44,11 +47,5 @@ namespace Trustcoin.Main
 
         public string GetName(int peerId)
             => _peers[peerId].Name;
-
-        public Transaction<MoneyTransfer> ConfirmTransaction(int initiatorId, int receiverId, Transaction<MoneyTransfer> transaction)
-        {
-            var peer = _peers[receiverId];
-            return peer.ConfirmMoneyTransfer(transaction);
-        }
     }
 }

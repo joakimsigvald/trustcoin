@@ -4,6 +4,6 @@ namespace Trustcoin.Story
     {
         Artefact CreateArtefact(string name);
         PrivateAccount CreatePrivateAccount(string name);
-        Transaction<TContent> CreateTransaction<TContent>(TContent content);
+        Transaction<TContent> CreateTransaction<TContent>(int signature, TContent content);
     }
 }

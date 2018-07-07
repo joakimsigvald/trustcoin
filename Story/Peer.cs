@@ -7,11 +7,11 @@ namespace Trustcoin.Story
     public interface Peer : Person
     {
         ConfidenceValue GetMoney(int targetId, Guid? beforeTransaction, params int[] whosAsking);
-        void Receive(Transaction<GotArtefact> gotArtefact);
-        void Receive(Transaction<LostArtefact> lostArtefact);
-        void Receive(Transaction<Endorcement> endorcement);
-        void Receive(Transaction<Compliment> compliment);
-        void Receive(Transaction<MoneyTransfer> moneyTransfer);
-        Transaction<MoneyTransfer> ConfirmMoneyTransfer(Transaction<MoneyTransfer> transaction);
+        void Receive(Transaction<GotArtefact> _);
+        void Receive(Transaction<LostArtefact> _);
+        void Receive(Transaction<Endorcement> _);
+        void Receive(Transaction<Compliment> _);
+        void Receive(Transaction<MoneyTransferAccepted> _);
+        void Receive(Transaction<MoneyTransferInitiated> _);
     }
 }

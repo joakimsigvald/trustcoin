@@ -18,10 +18,14 @@ namespace Trustcoin.Story.Data
         private readonly Dictionary<int, ArtefactData> _artefacts = new Dictionary<int, ArtefactData>();
         private ConfidenceValue _money;
 
-        internal PersonData(string name)
-            => Name = name;
+        internal PersonData(int id, string name)
+        {
+            Id = id;
+            Name = name;
+        }
 
-        internal string Name { get; set; }
+        internal int Id { get; set; }
+        internal string Name { get; }
         internal bool IsEndorced { get; set; }
 
         internal float Trust { get; private set; }
